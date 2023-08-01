@@ -1,4 +1,4 @@
-package main
+package gookie
 
 import (
 	"crypto/aes"
@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
+	"gopkg.in/ini.v1"
 )
 
 func checkError(err error) {
@@ -39,7 +40,7 @@ func decryptEncryptedValue(value []byte, key []byte) string {
 	return strValue
 }
 
-type RawCookie struct {
+type RawChromeCookie struct {
 	HostKey            string `json:"hostKey"`
 	Path               string `json:"path"`
 	IsSecure           int    `json:"isSecure"`
@@ -50,7 +51,7 @@ type RawCookie struct {
 	SameSite           int    `json:"sameSite"`
 }
 
-func queryCookies(conn *sql.DB, v10Key []byte, optionalParams ...string) []RawCookie {
+func queryCookiesChrome(conn *sql.DB, v10Key []byte, optionalParams ...string) []RawChromeCookie {
 	var domain string = "" // default value
 	if len(optionalParams) > 0 {
 		domain = optionalParams[0]
@@ -71,7 +72,7 @@ func queryCookies(conn *sql.DB, v10Key []byte, optionalParams ...string) []RawCo
 	defer rows.Close()
 	defer conn.Close()
 
-	var cookies []RawCookie
+	var cookies []RawChromeCookie
 
 	for rows.Next() {
 		var hostKey, path, name, value string
@@ -84,7 +85,7 @@ func queryCookies(conn *sql.DB, v10Key []byte, optionalParams ...string) []RawCo
 			continue
 		}
 		value = decryptEncryptedValue(encryptedValue, v10Key)
-		cookie := RawCookie{
+		cookie := RawChromeCookie{
 			HostKey:            hostKey,
 			Path:               path,
 			IsSecure:           isSecure,
@@ -99,7 +100,7 @@ func queryCookies(conn *sql.DB, v10Key []byte, optionalParams ...string) []RawCo
 	return cookies
 }
 
-func getChromeCookies(keyPath string, cookiesPath string) []RawCookie {
+func getChromeCookies(keyPath string, cookiesPath string) []RawChromeCookie {
 	keyContent, _ := ioutil.ReadFile(keyPath)
 	var jsonKey map[string]interface{}
 	err := json.Unmarshal(keyContent, &jsonKey)
@@ -113,21 +114,96 @@ func getChromeCookies(keyPath string, cookiesPath string) []RawCookie {
 
 	conn, err := sql.Open("sqlite3", cookiesPath+"?mode=ro") // read only
 	checkError(err)
-	return queryCookies(conn, v10key)
+	return queryCookiesChrome(conn, v10key)
 }
 
 func findChromePaths() (string, string) {
-	appDataPath := os.Getenv("appdata")
+	appDataPath := os.Getenv("APPDATA")
 	userDataPath := fmt.Sprintf("%v%v", appDataPath, filepath.FromSlash("/../local/Google/Chrome/User Data"))
 	keyPath := filepath.Join(userDataPath, "Local State")
 	dbPath := filepath.Join(userDataPath, "Default/Network/Cookies")
 	return keyPath, dbPath
 }
 
-func main() {
-	keyPath, dbPath := findChromePaths()
-	cookies := getChromeCookies(keyPath, dbPath)
-	for _, cookie := range cookies {
-		fmt.Println(cookie)
+func GetChromeCookies(params ...string) []RawChromeCookie {
+	var keyPath, dbPath string
+
+	// If parameters are provided, use them directly
+	if len(params) >= 2 {
+		keyPath = params[0]
+		dbPath = params[1]
+	} else {
+		// If parameters are not provided, get them from findChromePaths function
+		keyPath, dbPath = findChromePaths()
 	}
+
+	cookies := getChromeCookies(keyPath, dbPath)
+	return cookies
+}
+
+type RawFirefoxCookie struct {
+	Host       string `json:"host"`
+	Path       string `json:"path"`
+	IsSecure   int    `json:"isSecure"`
+	Expires    int    `json:"expiresNtTimeEpoch"`
+	Name       string `json:"name"`
+	Value      string `json:"value"`
+	IsHttpOnly int    `json:"isHttpOnly"`
+	SameSite   int    `json:"sameSite"`
+}
+
+func queryCookiesFirefox(conn *sql.DB, optionalParams ...string) []RawFirefoxCookie {
+	var domain string = "" // default value
+	if len(optionalParams) > 0 {
+		domain = optionalParams[0]
+	}
+	query := `
+	SELECT host, path, isSecure, expiry, name, value, isHttpOnly, sameSite
+	FROM moz_cookies 
+	WHERE host like ?;
+	`
+
+	rows, err := conn.Query(query, "%"+domain+"%")
+	checkError(err)
+	defer rows.Close()
+	defer conn.Close()
+
+	var cookies []RawFirefoxCookie
+
+	for rows.Next() {
+		var host, path, name, value string
+		var isSecure, isHttpOnly, sameSite, expires int
+
+		err := rows.Scan(&host, &path, &isSecure, &expires, &name, &value, &isHttpOnly, &sameSite)
+		if err != nil {
+			fmt.Println("Error scanning row:", err)
+			continue
+		}
+		cookie := RawFirefoxCookie{
+			Host:       host,
+			Path:       path,
+			IsSecure:   isSecure,
+			Expires:    expires,
+			Name:       name,
+			Value:      value,
+			IsHttpOnly: isHttpOnly,
+			SameSite:   sameSite,
+		}
+		cookies = append(cookies, cookie)
+	}
+	return cookies
+}
+
+func GetFIrefoxCookies(params ...string) []RawFirefoxCookie {
+	appDataPath := os.Getenv("APPDATA")
+	firefoxDataPath := filepath.Join(appDataPath, "/Mozilla/Firefox")
+	cfg, err := ini.Load(filepath.Join(firefoxDataPath, "profiles.ini"))
+	checkError(err)
+	defaultProfilePath := cfg.Section("Profile0").Key("Path").String()
+	defaultProfilePath = filepath.Join(firefoxDataPath, defaultProfilePath)
+	cookiesPath := filepath.Join(defaultProfilePath, "/cookies.sqlite")
+	conn, err := sql.Open("sqlite3", cookiesPath+"?mode=ro") // read only
+	checkError(err)
+	cookies := queryCookiesFirefox(conn)
+	return cookies
 }

@@ -1,4 +1,4 @@
-package main
+package gookie
 
 import (
 	"encoding/binary"
