@@ -9,7 +9,7 @@ import (
 
 // some API constants
 const (
-	CRYPTPROTECT_UI_FORBIDDEN = 0x1
+	cryptprotect_ui_forbidden = 0x1
 )
 
 var (
@@ -21,34 +21,34 @@ var (
 	procLocalFree   = dllkernel32.NewProc("LocalFree")
 )
 
-// DATA_BLOB  is a structure used by Windows DPAPI Crypt32.dll::CryptProtectData(DATA_BLOB...)
-type DATA_BLOB struct {
+// tDataBlob  is a structure used by Windows DPAPI Crypt32.dll::CryptProtectData(tDataBlob...)
+type tDataBlob struct {
 	cbData uint32
 	pbData *byte
 }
 
-// NewBlob creates DATA_BLOB and fills member pbData
-func NewBlob(d []byte) *DATA_BLOB {
+// newBlob creates DATA_BLOB and fills member pbData
+func newBlob(d []byte) *tDataBlob {
 	if len(d) == 0 {
-		return &DATA_BLOB{}
+		return &tDataBlob{}
 	}
-	return &DATA_BLOB{
+	return &tDataBlob{
 		pbData: &d[0],
 		cbData: uint32(len(d)),
 	}
 }
 
 // ToByteArray creates []byte from *byte member
-func (b *DATA_BLOB) ToByteArray() []byte {
+func (b *tDataBlob) ToByteArray() []byte {
 	d := make([]byte, b.cbData)
 	copy(d, (*[1 << 30]byte)(unsafe.Pointer(b.pbData))[:])
 	return d
 }
 
-// Encrypt calls DPAPI CryptProtectData
-func Encrypt(data []byte) ([]byte, error) {
-	var outblob DATA_BLOB
-	r, _, err := procEncryptData.Call(uintptr(unsafe.Pointer(NewBlob(data))), 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(&outblob)))
+// encrypt calls DPAPI CryptProtectData
+func encrypt(data []byte) ([]byte, error) {
+	var outblob tDataBlob
+	r, _, err := procEncryptData.Call(uintptr(unsafe.Pointer(newBlob(data))), 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(&outblob)))
 	if r == 0 {
 		return nil, err
 	}
@@ -57,10 +57,10 @@ func Encrypt(data []byte) ([]byte, error) {
 	return outblob.ToByteArray(), nil
 }
 
-// Decrypt calls Crypt32.dll::CryptUnprotectData
-func Decrypt(data []byte) ([]byte, error) {
-	var outblob DATA_BLOB
-	r, _, err := procDecryptData.Call(uintptr(unsafe.Pointer(NewBlob(data))), 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(&outblob)))
+// decrypt calls Crypt32.dll::CryptUnprotectData
+func decrypt(data []byte) ([]byte, error) {
+	var outblob tDataBlob
+	r, _, err := procDecryptData.Call(uintptr(unsafe.Pointer(newBlob(data))), 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(&outblob)))
 	if r == 0 {
 		return nil, err
 	}
@@ -68,8 +68,8 @@ func Decrypt(data []byte) ([]byte, error) {
 	return outblob.ToByteArray(), nil
 }
 
-// ConvertToUTF16LittleEndianBytes , Windows is Little endian.
-func ConvertToUTF16LittleEndianBytes(s string) []byte {
+// convertToUTF16LittleEndianBytes , Windows is Little endian.
+func convertToUTF16LittleEndianBytes(s string) []byte {
 	u := utf16.Encode([]rune(s)) // encode in UTF16
 	b := make([]byte, 2*len(u))
 	for index, value := range u {
