@@ -34,7 +34,8 @@ func main() {
 ### TODO
 
 - [x] Support Firefox
-- [ ] Support Linux / OSX
+- [ ] Support Linux / OSX (currenly only firefox supported)
+- [ ] Cross Platform code organize (build constraints)
 - [ ] Makefile
 - [x] Examples
 - [x] Create go package at pkg.go.dev
