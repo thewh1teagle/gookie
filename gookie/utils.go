@@ -1,6 +1,7 @@
 package gookie
 
 import (
+	"os"
 	"time"
 )
 
@@ -26,4 +27,9 @@ func checkError(err error) {
 	if err != nil {
 		panic(err.Error())
 	}
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }

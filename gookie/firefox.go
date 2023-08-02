@@ -2,9 +2,11 @@ package gookie
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"gopkg.in/ini.v1"
@@ -54,9 +56,38 @@ func queryCookiesFirefox(conn *sql.DB, optionalParams ...string) []Cookie {
 	return cookies
 }
 
+func findFirefoxDataPath() (string, error) {
+	switch runtime.GOOS {
+	case "windows":
+		appDataPath := os.Getenv("APPDATA")
+		dataPath := filepath.Join(appDataPath, "/Mozilla/Firefox")
+		return dataPath, nil
+	case "linux":
+		homePath, _ := os.UserHomeDir()
+		linuxPaths := []string{
+			filepath.Join(homePath, "/snap/firefox/common/.mozilla/firefox"),
+			filepath.Join(homePath, "/.mozilla/firefox"),
+		}
+		for _, path := range linuxPaths {
+			if pathExists(path) {
+				return path, nil
+			} else {
+				fmt.Printf("path not exists %v\n", path)
+			}
+		}
+	case "darwin":
+		homePath, _ := os.UserHomeDir()
+		path := filepath.Join(homePath, "/Library/Application Support/Firefox")
+		if pathExists(path) {
+			return path, nil
+		}
+	}
+	return "", errors.New("User data not found for firefox browser")
+}
+
 func Firefox(params ...string) []Cookie {
-	appDataPath := os.Getenv("APPDATA")
-	firefoxDataPath := filepath.Join(appDataPath, "/Mozilla/Firefox")
+	firefoxDataPath, _ := findFirefoxDataPath()
+	fmt.Printf("Firefox path: %v\n", firefoxDataPath)
 	cfg, err := ini.Load(filepath.Join(firefoxDataPath, "profiles.ini"))
 	checkError(err)
 	defaultProfilePath := cfg.Section("Profile0").Key("Path").String()
