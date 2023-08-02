@@ -11,7 +11,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+func convertChromiumTimestampToUnix(timestamp int) time.Time {
+	if timestamp == 0 {
+		return time.Unix(int64(0), int64(0))
+	}
+	return time.Unix(int64((timestamp-11644473600000000)/1000000), int64(0))
+}
 
 func getChromeCookies(keyPath string, cookiesPath string) []Cookie {
 	keyContent, _ := ioutil.ReadFile(keyPath)
@@ -91,19 +99,20 @@ func queryCookiesChrome(conn *sql.DB, v10Key []byte, optionalParams ...string) [
 			continue
 		}
 
-		expires := expiresNtTimeEpochToTime(int64(expiresNtTimeEpoch))
+		expires := convertChromiumTimestampToUnix(expiresNtTimeEpoch) // 17-digit precision Unix time (UTC)
 		value = decryptEncryptedValue(encryptedValue, v10Key)
 		cookie := Cookie{
-			Host:       hostKey,
-			Path:       path,
-			IsSecure:   isSecure,
-			Expires:    expires,
-			Name:       name,
-			Value:      value,
-			IsHttpOnly: isHttpOnly,
-			SameSite:   sameSite,
+			Host:     hostKey,
+			Path:     path,
+			Secure:   isSecure,
+			Expires:  expires,
+			Name:     name,
+			Value:    value,
+			HttpOnly: isHttpOnly,
+			SameSite: sameSite,
 		}
 		cookies = append(cookies, cookie)
+
 	}
 	return cookies
 }
@@ -119,7 +128,6 @@ func Chrome(params ...string) []Cookie {
 		// If parameters are not provided, get them from findChromePaths function
 		keyPath, dbPath = findChromePaths()
 	}
-
 	cookies := getChromeCookies(keyPath, dbPath)
 	return cookies
 }

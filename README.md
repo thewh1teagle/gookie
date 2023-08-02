@@ -15,5 +15,5 @@
 - [ ] Makefile
 - [x] Examples
 - [x] Create go package at pkg.go.dev
-- [ ] Load into `net/http` with `cookiejar`
+- [x] Load into `net/http` with `cookiejar`
 - [ ] Tests

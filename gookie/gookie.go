@@ -12,14 +12,14 @@ import (
 )
 
 type Cookie struct {
-	Host       string    `json:"hostKey"`
-	Path       string    `json:"path"`
-	IsSecure   bool      `json:"isSecure"`
-	Expires    time.Time `json:"Expires"`
-	Name       string    `json:"name"`
-	Value      string    `json:"value"`
-	IsHttpOnly bool      `json:"isHttpOnly"`
-	SameSite   int       `json:"sameSite"`
+	Host     string    `json:"host"`
+	Path     string    `json:"path"`
+	Secure   bool      `json:"Secure"`
+	Expires  time.Time `json:"Expires"`
+	Name     string    `json:"name"`
+	Value    string    `json:"value"`
+	HttpOnly bool      `json:"HttpOnly"`
+	SameSite int       `json:"SameSite"`
 }
 
 func ToCookieJar(cookies []Cookie) http.CookieJar {
@@ -30,9 +30,14 @@ func ToCookieJar(cookies []Cookie) http.CookieJar {
 	for _, cookie := range cookies {
 		// Convert RawChromeCookie to http.Cookie
 		httpCookie := &http.Cookie{
-			Name:    cookie.Name,
-			Value:   cookie.Value,
-			Expires: cookie.Expires,
+			Name:     cookie.Name,
+			Value:    cookie.Value,
+			Expires:  cookie.Expires,
+			Path:     cookie.Path,
+			Domain:   cookie.Host,
+			Secure:   cookie.Secure,
+			SameSite: http.SameSite(cookie.SameSite),
+			HttpOnly: cookie.HttpOnly,
 		}
 
 		// Add the cookie to the cookiesMap under its HostKey
@@ -47,8 +52,6 @@ func ToCookieJar(cookies []Cookie) http.CookieJar {
 			fmt.Printf("Error parsing URL %s: %s\n", host, err)
 			continue
 		}
-		fmt.Printf("set cookies %v %v", u, hostCookies)
-		fmt.Println(u)
 		jar.SetCookies(u, hostCookies)
 	}
 	return jar

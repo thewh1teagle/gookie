@@ -1,6 +1,8 @@
 package gookie
 
-import "time"
+import (
+	"time"
+)
 
 func expiresNtTimeEpochToTime(value int64) time.Time {
 	expirationTime := time.Unix(value, 0)

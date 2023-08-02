@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/ini.v1"
 )
@@ -39,14 +40,14 @@ func queryCookiesFirefox(conn *sql.DB, optionalParams ...string) []Cookie {
 			continue
 		}
 		cookie := Cookie{
-			Host:       host,
-			Path:       path,
-			IsSecure:   isSecure,
-			Expires:    millisecondsToTime(expires),
-			Name:       name,
-			Value:      value,
-			IsHttpOnly: isHttpOnly,
-			SameSite:   sameSite,
+			Host:     host,
+			Path:     path,
+			Secure:   isSecure,
+			Expires:  time.Unix(expires, 0), // number of seconds since 1970
+			Name:     name,
+			Value:    value,
+			HttpOnly: isHttpOnly,
+			SameSite: sameSite,
 		}
 		cookies = append(cookies, cookie)
 	}
